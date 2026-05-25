@@ -6,9 +6,9 @@ import Nav from '@/components/Nav'
 
 type ActivityType = 'coffee' | 'game' | 'company'
 const TYPES: { id: ActivityType; icon: string; label: string; color: string }[] = [
-  { id: 'coffee',  icon: '☕', label: 'Coffee',          color: '#c8a83a' },
-  { id: 'game',    icon: '🃏', label: 'Card game',       color: '#7070ff' },
-  { id: 'company', icon: '🔇', label: 'Silent company',  color: '#4caf70' },
+  { id: 'coffee',  icon: '☕', label: 'Coffee',         color: '#c8882a' },
+  { id: 'game',    icon: '🃏', label: 'Card game',      color: '#8878e8' },
+  { id: 'company', icon: '🌿', label: 'Just company',   color: '#7eb87a' },
 ]
 
 interface Activity {
@@ -25,35 +25,30 @@ function uid() {
 }
 
 export default function Home() {
-  const [name, setName]           = useState('')
-  const [nameInput, setNameInput] = useState('')
+  const [name, setName]             = useState('')
+  const [nameInput, setNameInput]   = useState('')
   const [activities, setActivities] = useState<Activity[]>([])
-  const [myLat, setMyLat] = useState<number | null>(null)
-  const [myLng, setMyLng] = useState<number | null>(null)
-  const [postType, setPostType]   = useState<ActivityType | null>(null)
-  const [noteInput, setNoteInput] = useState('')
-  const [posting, setPosting]     = useState(false)
-  const [joining, setJoining]     = useState<string | null>(null)
-  const [locError, setLocError]   = useState('')
+  const [myLat, setMyLat]           = useState<number | null>(null)
+  const [myLng, setMyLng]           = useState<number | null>(null)
+  const [postType, setPostType]     = useState<ActivityType | null>(null)
+  const [noteInput, setNoteInput]   = useState('')
+  const [posting, setPosting]       = useState(false)
+  const [joining, setJoining]       = useState<string | null>(null)
   const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const n = typeof window !== 'undefined' ? (localStorage.getItem('zc_name') || '') : ''
     if (n) setName(n)
-    getLocation()
+    navigator.geolocation.getCurrentPosition(
+      p => { setMyLat(p.coords.latitude); setMyLng(p.coords.longitude) },
+      () => {}
+    )
     loadActivities()
     const ch = supabase.channel('activities-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, loadActivities)
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
-
-  function getLocation() {
-    navigator.geolocation.getCurrentPosition(
-      p => { setMyLat(p.coords.latitude); setMyLng(p.coords.longitude) },
-      () => setLocError('Allow location to see nearby activities')
-    )
-  }
 
   async function loadActivities() {
     const { data } = await supabase.from('activities').select('*')
@@ -104,81 +99,95 @@ export default function Home() {
     <>
       <div className="page" style={{ paddingTop: 20 }}>
 
-        {/* Header / name */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <div style={{ fontWeight: 900, fontSize: 22, letterSpacing: '-.02em' }}>Zugcafé</div>
+        {/* Header */}
+        <div className="top-bar">
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 24, letterSpacing: '-.03em', color: 'var(--text)' }}>
+              Zugcafé
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 1 }}>
+              Who&apos;s nearby right now
+            </div>
+          </div>
           {name
-            ? <button className="btn btn-ghost btn-sm" onClick={() => { localStorage.removeItem('zc_name'); setName('') }}>{name}</button>
+            ? <button className="btn btn-ghost btn-sm"
+                style={{ borderRadius: 20 }}
+                onClick={() => { localStorage.removeItem('zc_name'); setName('') }}>
+                {name}
+              </button>
             : <form onSubmit={saveName} style={{ display: 'flex', gap: 8 }}>
                 <input ref={nameRef} placeholder="Your name" value={nameInput}
                   onChange={e => setNameInput(e.target.value)} autoFocus
-                  style={{ width: 140 }} />
+                  style={{ width: 130, borderRadius: 20 }} />
                 <button className="btn btn-primary btn-sm" type="submit">→</button>
               </form>
           }
         </div>
 
-        {locError && (
-          <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
-            📍 {locError}
-            <button className="btn btn-ghost btn-sm" onClick={getLocation}>Allow</button>
-          </div>
-        )}
-
         {/* Post activity */}
         {!postType ? (
           <div style={{ marginBottom: 28 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--text2)', marginBottom: 10 }}>
-              I want to
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="section-label">I want to</div>
+            <div style={{ display: 'flex', gap: 10 }}>
               {TYPES.map(t => (
                 <button key={t.id}
-                  onClick={() => name ? setPostType(t.id) : nameRef.current?.focus()}
-                  style={{
-                    flex: 1, padding: '14px 8px', borderRadius: 14,
-                    background: 'var(--bg2)', border: '1px solid var(--border)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer',
-                  }}>
-                  <span style={{ fontSize: 26 }}>{t.icon}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{t.label}</span>
+                  className={`type-btn`}
+                  onClick={() => name ? setPostType(t.id) : nameRef.current?.focus()}>
+                  <span className="type-btn-icon">{t.icon}</span>
+                  <span className="type-btn-label">{t.label}</span>
                 </button>
               ))}
             </div>
           </div>
         ) : (
-          <div style={{ marginBottom: 28, background: 'var(--bg2)', border: `1px solid ${t!.color}55`, borderRadius: 16, padding: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <span style={{ fontSize: 24 }}>{t!.icon}</span>
-              <div style={{ fontWeight: 800, fontSize: 16 }}>{t!.label}</div>
-              <button style={{ marginLeft: 'auto', fontSize: 18, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}
+          <div className="post-form" style={{ marginBottom: 28, borderColor: `${t!.color}44` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <div className={`activity-icon activity-icon-${postType}`}>{t!.icon}</div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 16 }}>{t!.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--text3)' }}>Anyone nearby can join — no request needed</div>
+              </div>
+              <button style={{ marginLeft: 'auto', fontSize: 20, color: 'var(--text3)', lineHeight: 1 }}
                 onClick={() => { setPostType(null); setNoteInput('') }}>✕</button>
             </div>
-            <input placeholder="Note (optional) — 'at the window seat', 'beginners welcome'"
-              value={noteInput} onChange={e => setNoteInput(e.target.value)} style={{ marginBottom: 12 }} />
+            <input
+              placeholder="Add a note — 'at the window seat', 'beginners welcome'"
+              value={noteInput}
+              onChange={e => setNoteInput(e.target.value)}
+              style={{ marginBottom: 12 }}
+            />
             {myLat === null
-              ? <button className="btn btn-primary" style={{ width: '100%', height: 48 }} onClick={getLocation}>
+              ? <button className="btn btn-primary" style={{ width: '100%', height: 50 }}
+                  onClick={() => navigator.geolocation.getCurrentPosition(
+                    p => { setMyLat(p.coords.latitude); setMyLng(p.coords.longitude) }, () => {}
+                  )}>
                   Allow location to post
                 </button>
               : <button className="btn btn-primary" disabled={posting}
-                  style={{ width: '100%', height: 48, fontSize: 15, background: t!.color, color: '#0d0d0d' }}
+                  style={{ width: '100%', height: 50, background: t!.color, fontSize: 15, borderRadius: 12 }}
                   onClick={startActivity}>
-                  {posting ? 'Posting…' : `I'm open — post it`}
+                  {posting ? 'Posting…' : `I'm open — let people find me`}
                 </button>
             }
           </div>
         )}
 
         {/* Live feed */}
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--text2)', marginBottom: 12 }}>
-          {nearby.length > 0 ? `${nearby.length} happening nearby` : 'Nothing nearby yet'}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div className="section-label" style={{ margin: 0 }}>
+            {nearby.length > 0 ? `${nearby.length} happening nearby` : 'Nothing nearby yet'}
+          </div>
+          {nearby.length > 0 && <div className="live-badge"><span className="live-dot" />Live</div>}
         </div>
 
         {nearby.length === 0 && (
-          <div className="empty" style={{ paddingTop: 16 }}>
+          <div className="empty">
             <div className="empty-icon">🚆</div>
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>Be the first</div>
-            <div style={{ fontSize: 13, color: 'var(--text2)' }}>Post above — anyone nearby sees it and can join instantly. No invite, no waiting.</div>
+            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 8 }}>Be the first</div>
+            <div style={{ fontSize: 14, lineHeight: 1.6, maxWidth: 280, margin: '0 auto' }}>
+              Post above — anyone nearby sees it and can join instantly.<br />
+              No invite. No waiting. No rejection.
+            </div>
           </div>
         )}
 
@@ -187,29 +196,30 @@ export default function Home() {
             const type = TYPES.find(t => t.id === a.type)!
             const isOwn = a.user_id === uid()
             return (
-              <div key={a.id} style={{
-                background: 'var(--bg2)', borderRadius: 14, padding: '14px 16px',
-                borderLeft: `3px solid ${type.color}`, border: `1px solid var(--border)`,
-                borderLeftColor: type.color,
-                display: 'flex', alignItems: 'center', gap: 14,
-              }}>
-                <div style={{ fontSize: 28, flexShrink: 0 }}>{type.icon}</div>
+              <div key={a.id} className="activity-card"
+                style={{ borderLeftColor: type.color, borderLeftWidth: 3 }}>
+                <div className={`activity-icon activity-icon-${a.type}`}>{type.icon}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: 15 }}>
+                  <div className="activity-name">
                     {a.nickname}
-                    <span style={{ fontWeight: 400, color: 'var(--text2)', fontSize: 14 }}> · {type.label}</span>
+                    <span className="activity-type"> · {type.label}</span>
                   </div>
-                  {a.note && <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.note}</div>}
-                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4, display: 'flex', gap: 8 }}>
+                  {a.note && <div className="activity-note">{a.note}</div>}
+                  <div className="activity-meta">
                     {a.dist !== undefined && <span>📍 {distLabel(a.dist)}</span>}
-                    <span>👥 {a.participant_count} {a.participant_count === 1 ? 'person' : 'people'}</span>
+                    <span>👥 {a.participant_count}</span>
                   </div>
                 </div>
                 {isOwn
-                  ? <button className="btn btn-ghost btn-sm" onClick={() => window.location.href = `/room/${a.room_id}`}>Open</button>
-                  : <button className="btn btn-sm" disabled={joining === a.id}
-                      onClick={() => joinActivity(a)}
-                      style={{ background: type.color, color: '#0d0d0d', fontWeight: 800, flexShrink: 0, padding: '10px 16px', borderRadius: 10, fontSize: 14 }}>
+                  ? <button className="btn btn-ghost btn-sm"
+                      style={{ borderRadius: 10, flexShrink: 0 }}
+                      onClick={() => window.location.href = `/room/${a.room_id}`}>
+                      Open
+                    </button>
+                  : <button
+                      className={`join-btn join-btn-${a.type}`}
+                      disabled={joining === a.id}
+                      onClick={() => joinActivity(a)}>
                       {joining === a.id ? '…' : 'Join'}
                     </button>
                 }

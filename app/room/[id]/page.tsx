@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { use } from 'react'
 import UnoGame from '@/components/UnoGame'
 import Link from 'next/link'
 
@@ -26,8 +25,8 @@ function getUserId() {
   return id
 }
 
-export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function RoomPage({ params }: { params: { id: string } }) {
+  const { id } = params
   const [room, setRoom] = useState<Room | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')

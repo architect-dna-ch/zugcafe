@@ -1,14 +1,16 @@
 'use client'
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { haversineKm, distLabel } from '@/lib/geo'
 import Nav from '@/components/Nav'
 
+const EXPIRE_MS = 5 * 60 * 1000 // 5 minutes
+
 type ActivityType = 'coffee' | 'game' | 'company'
 const TYPES: { id: ActivityType; icon: string; label: string; color: string }[] = [
-  { id: 'coffee',  icon: '☕', label: 'Coffee',         color: '#c8882a' },
-  { id: 'game',    icon: '🃏', label: 'Card game',      color: '#8878e8' },
-  { id: 'company', icon: '🌿', label: 'Just company',   color: '#7eb87a' },
+  { id: 'coffee',  icon: '☕', label: 'Coffee',       color: '#c8882a' },
+  { id: 'game',    icon: '🃏', label: 'Card game',    color: '#8878e8' },
+  { id: 'company', icon: '🌿', label: 'Just company', color: '#7eb87a' },
 ]
 
 interface Activity {
@@ -24,6 +26,17 @@ function uid() {
   return id
 }
 
+function secsLeft(created_at: string) {
+  return Math.max(0, Math.round((new Date(created_at).getTime() + EXPIRE_MS - Date.now()) / 1000))
+}
+
+function fmtCountdown(secs: number) {
+  if (secs <= 0) return 'expired'
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
+  return m > 0 ? `${m}:${String(s).padStart(2,'0')}` : `${s}s`
+}
+
 export default function Home() {
   const [name, setName]             = useState('')
   const [nameInput, setNameInput]   = useState('')
@@ -34,6 +47,7 @@ export default function Home() {
   const [noteInput, setNoteInput]   = useState('')
   const [posting, setPosting]       = useState(false)
   const [joining, setJoining]       = useState<string | null>(null)
+  const [tick, setTick]             = useState(0)
   const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -47,19 +61,22 @@ export default function Home() {
     const ch = supabase.channel('activities-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, loadActivities)
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    // tick every second for countdown, reload feed every 30s
+    const tickInterval = setInterval(() => setTick(t => t + 1), 1000)
+    const reloadInterval = setInterval(loadActivities, 30000)
+    return () => { supabase.removeChannel(ch); clearInterval(tickInterval); clearInterval(reloadInterval) }
   }, [])
 
   async function loadActivities() {
     const { data } = await supabase.from('activities').select('*')
-      .gte('created_at', new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString())
+      .gte('created_at', new Date(Date.now() - EXPIRE_MS).toISOString())
       .order('created_at', { ascending: false })
     setActivities(data || [])
   }
 
   const nearby = activities
     .map(a => myLat !== null ? { ...a, dist: haversineKm(myLat, myLng!, a.lat, a.lng) } : a)
-    .filter(a => !myLat || (a.dist ?? 0) < 5)
+    .filter(a => (!myLat || (a.dist ?? 0) < 2) && secsLeft(a.created_at) > 0)
     .sort((a, b) => (a.dist ?? 99) - (b.dist ?? 99))
 
   async function startActivity() {
@@ -99,39 +116,31 @@ export default function Home() {
     <>
       <div className="page" style={{ paddingTop: 20 }}>
 
-        {/* Header */}
         <div className="top-bar">
           <div>
-            <div style={{ fontWeight: 900, fontSize: 24, letterSpacing: '-.03em', color: 'var(--text)' }}>
-              Zugcafé
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 1 }}>
-              Who&apos;s nearby right now
-            </div>
+            <div style={{ fontWeight: 900, fontSize: 24, letterSpacing: '-.03em' }}>Zugcafé</div>
+            <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 1 }}>Who&apos;s nearby right now</div>
           </div>
           {name
-            ? <button className="btn btn-ghost btn-sm"
-                style={{ borderRadius: 20 }}
+            ? <button className="btn btn-ghost btn-sm" style={{ borderRadius: 20 }}
                 onClick={() => { localStorage.removeItem('zc_name'); setName('') }}>
                 {name}
               </button>
             : <form onSubmit={saveName} style={{ display: 'flex', gap: 8 }}>
                 <input ref={nameRef} placeholder="Your name" value={nameInput}
-                  onChange={e => setNameInput(e.target.value)} autoFocus
-                  style={{ width: 130, borderRadius: 20 }} />
+                  onChange={e => setNameInput(e.target.value)} autoFocus style={{ width: 130, borderRadius: 20 }} />
                 <button className="btn btn-primary btn-sm" type="submit">→</button>
               </form>
           }
         </div>
 
-        {/* Post activity */}
+        {/* Post */}
         {!postType ? (
           <div style={{ marginBottom: 28 }}>
             <div className="section-label">I want to</div>
             <div style={{ display: 'flex', gap: 10 }}>
               {TYPES.map(t => (
-                <button key={t.id}
-                  className={`type-btn`}
+                <button key={t.id} className="type-btn"
                   onClick={() => name ? setPostType(t.id) : nameRef.current?.focus()}>
                   <span className="type-btn-icon">{t.icon}</span>
                   <span className="type-btn-label">{t.label}</span>
@@ -145,34 +154,28 @@ export default function Home() {
               <div className={`activity-icon activity-icon-${postType}`}>{t!.icon}</div>
               <div>
                 <div style={{ fontWeight: 800, fontSize: 16 }}>{t!.label}</div>
-                <div style={{ fontSize: 12, color: 'var(--text3)' }}>Anyone nearby can join — no request needed</div>
+                <div style={{ fontSize: 12, color: 'var(--text3)' }}>Visible for 5 min · anyone nearby can join</div>
               </div>
               <button style={{ marginLeft: 'auto', fontSize: 20, color: 'var(--text3)', lineHeight: 1 }}
                 onClick={() => { setPostType(null); setNoteInput('') }}>✕</button>
             </div>
-            <input
-              placeholder="Add a note — 'at the window seat', 'beginners welcome'"
-              value={noteInput}
-              onChange={e => setNoteInput(e.target.value)}
-              style={{ marginBottom: 12 }}
-            />
+            <input placeholder="Note — 'window seat', 'wagon 3'"
+              value={noteInput} onChange={e => setNoteInput(e.target.value)} style={{ marginBottom: 12 }} />
             {myLat === null
               ? <button className="btn btn-primary" style={{ width: '100%', height: 50 }}
                   onClick={() => navigator.geolocation.getCurrentPosition(
                     p => { setMyLat(p.coords.latitude); setMyLng(p.coords.longitude) }, () => {}
-                  )}>
-                  Allow location to post
-                </button>
+                  )}>Allow location to post</button>
               : <button className="btn btn-primary" disabled={posting}
                   style={{ width: '100%', height: 50, background: t!.color, fontSize: 15, borderRadius: 12 }}
                   onClick={startActivity}>
-                  {posting ? 'Posting…' : `I'm open — let people find me`}
+                  {posting ? 'Posting…' : `I'm open — post it`}
                 </button>
             }
           </div>
         )}
 
-        {/* Live feed */}
+        {/* Feed */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div className="section-label" style={{ margin: 0 }}>
             {nearby.length > 0 ? `${nearby.length} happening nearby` : 'Nothing nearby yet'}
@@ -184,9 +187,8 @@ export default function Home() {
           <div className="empty">
             <div className="empty-icon">🚆</div>
             <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 8 }}>Be the first</div>
-            <div style={{ fontSize: 14, lineHeight: 1.6, maxWidth: 280, margin: '0 auto' }}>
-              Post above — anyone nearby sees it and can join instantly.<br />
-              No invite. No waiting. No rejection.
+            <div style={{ fontSize: 14, lineHeight: 1.6, maxWidth: 280, margin: '0 auto', color: 'var(--text2)' }}>
+              Post above — visible for 5 minutes.<br />Anyone nearby can join instantly.
             </div>
           </div>
         )}
@@ -195,9 +197,10 @@ export default function Home() {
           {nearby.map(a => {
             const type = TYPES.find(t => t.id === a.type)!
             const isOwn = a.user_id === uid()
+            const secs = secsLeft(a.created_at)
+            const urgent = secs < 60
             return (
-              <div key={a.id} className="activity-card"
-                style={{ borderLeftColor: type.color, borderLeftWidth: 3 }}>
+              <div key={a.id} className="activity-card" style={{ borderLeftColor: type.color, borderLeftWidth: 3 }}>
                 <div className={`activity-icon activity-icon-${a.type}`}>{type.icon}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="activity-name">
@@ -208,17 +211,15 @@ export default function Home() {
                   <div className="activity-meta">
                     {a.dist !== undefined && <span>📍 {distLabel(a.dist)}</span>}
                     <span>👥 {a.participant_count}</span>
+                    <span style={{ color: urgent ? '#d96060' : 'var(--text3)', fontWeight: urgent ? 700 : 400 }}>
+                      ⏱ {fmtCountdown(secs)}
+                    </span>
                   </div>
                 </div>
                 {isOwn
-                  ? <button className="btn btn-ghost btn-sm"
-                      style={{ borderRadius: 10, flexShrink: 0 }}
-                      onClick={() => window.location.href = `/room/${a.room_id}`}>
-                      Open
-                    </button>
-                  : <button
-                      className={`join-btn join-btn-${a.type}`}
-                      disabled={joining === a.id}
+                  ? <button className="btn btn-ghost btn-sm" style={{ borderRadius: 10, flexShrink: 0 }}
+                      onClick={() => window.location.href = `/room/${a.room_id}`}>Open</button>
+                  : <button className={`join-btn join-btn-${a.type}`} disabled={joining === a.id}
                       onClick={() => joinActivity(a)}>
                       {joining === a.id ? '…' : 'Join'}
                     </button>

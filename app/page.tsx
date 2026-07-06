@@ -48,15 +48,28 @@ export default function Home() {
   const [posting, setPosting]       = useState(false)
   const [joining, setJoining]       = useState<string | null>(null)
   const [tick, setTick]             = useState(0)
+  const [onboarded, setOnboarded]   = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    const n = typeof window !== 'undefined' ? (localStorage.getItem('zc_name') || '') : ''
-    if (n) setName(n)
+  function requestLocation() {
     navigator.geolocation.getCurrentPosition(
       p => { setMyLat(p.coords.latitude); setMyLng(p.coords.longitude) },
       () => {}
     )
+  }
+
+  function finishOnboarding() {
+    localStorage.setItem('zc_onboarded', '1')
+    setOnboarded(true)
+    requestLocation()
+  }
+
+  useEffect(() => {
+    const n = typeof window !== 'undefined' ? (localStorage.getItem('zc_name') || '') : ''
+    if (n) setName(n)
+    const alreadyOnboarded = !!localStorage.getItem('zc_onboarded')
+    setOnboarded(alreadyOnboarded)
+    if (alreadyOnboarded) requestLocation()
     loadActivities()
     const ch = supabase.channel('activities-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, loadActivities)
@@ -111,6 +124,32 @@ export default function Home() {
   }
 
   const t = TYPES.find(t => t.id === postType)
+
+  if (!onboarded) {
+    return (
+      <div className="page" style={{ paddingTop: '18vh', textAlign: 'center' }}>
+        <div style={{ fontSize: 56, marginBottom: 20 }}>☕</div>
+        <div style={{ fontWeight: 900, fontSize: 28, letterSpacing: '-.03em', marginBottom: 10 }}>Zugcafé</div>
+        <div style={{ fontSize: 15, color: 'var(--text2)', maxWidth: 320, margin: '0 auto 36px', lineHeight: 1.7 }}>
+          Post that you&apos;re open for coffee, a card game, or company — visible for 5 minutes to people nearby.
+        </div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 36 }}>
+          {TYPES.map(t => (
+            <div key={t.id} style={{ textAlign: 'center' }}>
+              <div className={`activity-icon activity-icon-${t.id}`} style={{ margin: '0 auto 6px' }}>{t.icon}</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)' }}>{t.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 16, maxWidth: 280, margin: '0 auto 20px', lineHeight: 1.6 }}>
+          We&apos;ll ask for your location next — it&apos;s only used to show what&apos;s nearby, never stored on a server.
+        </div>
+        <button className="btn btn-primary" style={{ padding: '14px 32px', borderRadius: 14 }} onClick={finishOnboarding}>
+          Get started
+        </button>
+      </div>
+    )
+  }
 
   return (
     <>

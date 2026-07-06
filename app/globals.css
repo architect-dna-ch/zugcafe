@@ -75,7 +75,7 @@ input::placeholder,textarea::placeholder{color:var(--text3)}
   padding-bottom:env(safe-area-inset-bottom);
 }
 .nav a{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;
   padding:10px 0;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
   color:var(--text3);transition:color .15s;
 }
@@ -133,7 +133,7 @@ input::placeholder,textarea::placeholder{color:var(--text3)}
 
 /* Type picker */
 .type-btn{
-  flex:1;padding:16px 8px;border-radius:16px;
+  flex:1;min-width:0;padding:16px 6px;border-radius:16px;
   background:var(--bg2);border:1px solid var(--border);
   display:flex;flex-direction:column;align-items:center;gap:8px;
   cursor:pointer;transition:all .2s;
@@ -143,7 +143,10 @@ input::placeholder,textarea::placeholder{color:var(--text3)}
 .type-btn.active-game{background:rgba(136,120,232,.1);border-color:rgba(136,120,232,.4);box-shadow:0 0 20px rgba(136,120,232,.08)}
 .type-btn.active-company{background:rgba(126,184,122,.1);border-color:rgba(126,184,122,.4);box-shadow:0 0 20px rgba(126,184,122,.08)}
 .type-btn-icon{font-size:28px;line-height:1}
-.type-btn-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text2)}
+.type-btn-label{
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text2);
+  width:100%;text-align:center;white-space:normal;word-break:break-word;
+}
 
 /* Post form */
 .post-form{

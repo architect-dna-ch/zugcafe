@@ -27,6 +27,8 @@ create table if not exists rooms (
   type text not null default 'chat', -- 'chat' | 'game'
   name text,
   created_by text not null,
+  lat double precision, -- nullable: captured at creation, used only to filter the public /rooms browse list
+  lng double precision,
   created_at timestamptz not null default now()
 );
 

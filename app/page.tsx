@@ -85,7 +85,7 @@ export default function Home() {
     setPosting(true)
     const t = TYPES.find(t => t.id === postType)!
     const { data: room } = await supabase.from('rooms')
-      .insert({ type: postType === 'game' ? 'game' : 'chat', created_by: uid(), name: `${name} — ${t.label}` })
+      .insert({ type: postType === 'game' ? 'game' : 'chat', created_by: uid(), name: `${name} — ${t.label}`, lat: myLat, lng: myLng })
       .select().single()
     if (!room) { setPosting(false); return }
     await supabase.from('activities').insert({

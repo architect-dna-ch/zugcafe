@@ -45,11 +45,25 @@ create table if not exists game_rooms (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists activities (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references rooms(id) on delete cascade,
+  user_id text not null,
+  nickname text not null,
+  type text not null, -- 'coffee' | 'game' | 'company'
+  note text,
+  lat double precision not null,
+  lng double precision not null,
+  participant_count integer not null default 1,
+  created_at timestamptz not null default now()
+);
+
 -- Enable realtime on all tables
 alter publication supabase_realtime add table presence;
 alter publication supabase_realtime add table messages;
 alter publication supabase_realtime add table game_rooms;
 alter publication supabase_realtime add table open_seats;
+alter publication supabase_realtime add table activities;
 
 -- RLS: open read, authenticated by user_id header (we use anon key + row ownership)
 alter table presence enable row level security;
@@ -57,6 +71,7 @@ alter table open_seats enable row level security;
 alter table rooms enable row level security;
 alter table messages enable row level security;
 alter table game_rooms enable row level security;
+alter table activities enable row level security;
 
 create policy "anyone can read presence" on presence for select using (true);
 create policy "anyone can upsert own presence" on presence for all using (true) with check (true);
@@ -73,3 +88,6 @@ create policy "anyone can send message" on messages for insert with check (true)
 
 create policy "anyone can read game" on game_rooms for select using (true);
 create policy "anyone can update game" on game_rooms for all using (true) with check (true);
+
+create policy "anyone can read activities" on activities for select using (true);
+create policy "anyone can post activity" on activities for all using (true) with check (true);

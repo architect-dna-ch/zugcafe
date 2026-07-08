@@ -57,18 +57,14 @@ export default function UnoGame({ roomId, userId, nickname }: Props) {
     const existingPlayers = state?.players || []
     if (existingPlayers.includes(userId)) { setJoined(true); return }
     const newPlayers = [...existingPlayers, userId]
-
-    // Store nickname in messages-like way via presence (simplified: just use localStorage mapping)
-    const names = JSON.parse(localStorage.getItem('zc_player_names') || '{}')
-    names[userId] = name
-    localStorage.setItem('zc_player_names', JSON.stringify(names))
+    const newNames = { ...(state?.names || {}), [userId]: name }
 
     if (state) {
-      await save({ ...state, players: newPlayers })
+      await save({ ...state, players: newPlayers, names: newNames })
     } else {
       // Empty lobby — do NOT deal cards yet. Real dealing happens in startGame().
       await save({
-        deck: [], discard: [], hands: {}, players: newPlayers,
+        deck: [], discard: [], hands: {}, players: newPlayers, names: newNames,
         currentPlayerIndex: 0, direction: 1, pendingDraw: 0, winner: null, currentColor: 'red',
       })
     }
@@ -77,7 +73,7 @@ export default function UnoGame({ roomId, userId, nickname }: Props) {
 
   async function startGame() {
     if (!state || state.players.length < 2) return
-    const newState = createGame(state.players)
+    const newState = createGame(state.players, state.names)
     await save(newState)
   }
 
@@ -109,8 +105,7 @@ export default function UnoGame({ roomId, userId, nickname }: Props) {
   }
 
   function getPlayerName(id: string) {
-    const names = JSON.parse(localStorage.getItem('zc_player_names') || '{}')
-    return names[id] || id.slice(0, 6)
+    return state?.names?.[id] || id.slice(0, 6)
   }
 
   if (loading) return <div style={{ textAlign: 'center', padding: 32 }}><div className="spinner" /></div>
@@ -177,7 +172,7 @@ export default function UnoGame({ roomId, userId, nickname }: Props) {
           className="btn btn-primary"
           style={{ marginTop: 20 }}
           onClick={async () => {
-            const newState = createGame(state.players)
+            const newState = createGame(state.players, state.names)
             await save(newState)
           }}
         >

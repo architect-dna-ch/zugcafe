@@ -6,6 +6,7 @@ export interface GameState {
   discard: Card[]
   hands: Record<string, Card[]>
   players: string[]
+  names: Record<string, string>
   currentPlayerIndex: number
   direction: 1 | -1
   pendingDraw: number
@@ -47,7 +48,7 @@ export function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
-export function createGame(players: string[]): GameState {
+export function createGame(players: string[], names: Record<string, string> = {}): GameState {
   const deck = buildDeck()
   const hands: Record<string, Card[]> = {}
   for (const p of players) {
@@ -61,6 +62,7 @@ export function createGame(players: string[]): GameState {
     discard: [startCard],
     hands,
     players,
+    names,
     currentPlayerIndex: 0,
     direction: 1,
     pendingDraw: 0,

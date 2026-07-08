@@ -52,7 +52,7 @@ export default function UnoGame({ roomId, userId, nickname }: Props) {
     const name = nameInput.trim() || nickname
     if (!name) return
     if (state && state.players.length >= 4) return
-    if (state && !state.winner && state.deck.length > 0) return // game in progress
+    if (state && state.deck.length > 0) return // game already started — cards have been dealt
 
     const existingPlayers = state?.players || []
     if (existingPlayers.includes(userId)) { setJoined(true); return }
@@ -64,11 +64,13 @@ export default function UnoGame({ roomId, userId, nickname }: Props) {
     localStorage.setItem('zc_player_names', JSON.stringify(names))
 
     if (state) {
-      await save({ ...state, players: newPlayers, hands: { ...state.hands, [userId]: [] } })
+      await save({ ...state, players: newPlayers })
     } else {
-      const init: GameState = createGame([userId])
-      init.players = [userId]
-      await save(init)
+      // Empty lobby — do NOT deal cards yet. Real dealing happens in startGame().
+      await save({
+        deck: [], discard: [], hands: {}, players: newPlayers,
+        currentPlayerIndex: 0, direction: 1, pendingDraw: 0, winner: null, currentColor: 'red',
+      })
     }
     setJoined(true)
   }
